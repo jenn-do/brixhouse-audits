@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Q1 Churn Diagnostic | Brixhouse Consulting</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+
+  :root {
+    --navy: #1a2744; --navy-dark: #111c33; --blue: #2563eb; --blue-light: #3b82f6;
+    --yellow: #fbbf24; --yellow-light: #fcd34d; --white: #ffffff; --off-white: #f4f6fb;
+    --light-gray: #e8edf5; --mid-gray: #94a3b8; --text: #1e293b; --text-muted: #64748b;
+    --danger: #dc2626; --warning: #d97706; --success: #059669; --border: #dde3ef;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--white); color: var(--text); font-family: 'DM Sans', sans-serif; font-weight: 400; line-height: 1.6; }
+
+  .progress-bar-wrap { position: fixed; top: 0; left: 0; right: 0; z-index: 200; background: var(--navy-dark); padding: 10px 8vw; display: flex; align-items: center; gap: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.3); }
+  .pb-label { font-size: 11px; font-weight: 600; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(255,255,255,0.5); white-space: nowrap; flex-shrink: 0; }
+  .pb-track { flex: 1; height: 8px; background: rgba(255,255,255,0.1); border-radius: 100px; overflow: hidden; }
+  .pb-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--blue), var(--yellow)); border-radius: 100px; transition: width 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+  .pb-count { font-size: 12px; font-weight: 600; color: var(--yellow); white-space: nowrap; flex-shrink: 0; min-width: 52px; text-align: right; }
+  .pb-sections { display: flex; gap: 6px; flex-shrink: 0; }
+  .pb-dot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 10px; color: rgba(255,255,255,0.3); font-weight: 700; transition: all 0.3s ease; }
+  .pb-dot.done { background: var(--yellow); border-color: var(--yellow); color: var(--navy); }
+  .pb-dot.partial { border-color: var(--blue); color: var(--blue); }
+
+  nav { background: var(--white); border-bottom: 1px solid var(--border); padding: 20px 8vw; margin-top: 48px; display: flex; align-items: center; justify-content: space-between; }
+  .nav-brand { display: flex; flex-direction: column; line-height: 1.1; }
+  .nav-brand .wordmark { font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 18px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--navy); }
+  .nav-brand .sub { font-family: 'Playfair Display', serif; font-style: italic; font-size: 13px; color: var(--navy); font-weight: 400; }
+  .nav-cta { background: var(--blue); color: var(--white); font-size: 13px; font-weight: 500; padding: 10px 22px; border-radius: 6px; text-decoration: none; transition: background 0.2s; }
+  .nav-cta:hover { background: var(--blue-light); }
+
+  .hero { background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy) 60%, #1e3a6e 100%); padding: 80px 8vw 90px; position: relative; overflow: hidden; }
+  .hero::after { content: ''; position: absolute; bottom: -2px; left: 0; right: 0; height: 60px; background: var(--white); clip-path: ellipse(55% 100% at 50% 100%); }
+  .hero-tag { display: inline-flex; align-items: center; gap: 8px; background: rgba(251,191,36,0.15); border: 1px solid rgba(251,191,36,0.4); color: var(--yellow); font-size: 12px; font-weight: 500; letter-spacing: 0.15em; text-transform: uppercase; padding: 6px 14px; border-radius: 100px; margin-bottom: 28px; opacity: 0; animation: fadeUp 0.6s ease forwards 0.1s; }
+  .hero h1 { font-family: 'DM Sans', sans-serif; font-size: clamp(36px, 5vw, 64px); font-weight: 600; color: var(--white); line-height: 1.1; max-width: 780px; margin-bottom: 20px; opacity: 0; animation: fadeUp 0.6s ease forwards 0.2s; }
+  .hero h1 .highlight { background: var(--yellow); color: var(--navy); padding: 0 8px 2px; border-radius: 4px; display: inline; }
+  .hero-sub { font-size: 18px; color: rgba(255,255,255,0.7); max-width: 600px; margin-bottom: 48px; line-height: 1.7; opacity: 0; animation: fadeUp 0.6s ease forwards 0.3s; }
+  .hero-stats { display: flex; gap: 48px; flex-wrap: wrap; opacity: 0; animation: fadeUp 0.6s ease forwards 0.4s; }
+  .hero-stat .num { font-family: 'DM Sans', sans-serif; font-size: 32px; font-weight: 600; color: var(--yellow); display: block; line-height: 1; }
+  .hero-stat .label { font-size: 12px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 4px; display: block; }
+
+  .context-band { background: #fff8ed; border-top: 3px solid var(--yellow); border-bottom: 1px solid #fde8b0; padding: 28px 8vw; display: flex; align-items: flex-start; gap: 20px; }
+  .context-band .icon { font-size: 28px; flex-shrink: 0; margin-top: 2px; }
+  .context-band h3 { font-size: 15px; font-weight: 600; color: var(--navy); margin-bottom: 6px; }
+  .context-band p { font-size: 14px; color: var(--text-muted); line-height: 1.7; max-width: 780px; }
+  .context-band p strong { color: var(--text); font-weight: 500; }
+
+  .how-section { padding: 60px 8vw 48px; max-width: 1100px; margin: 0 auto; }
+  .section-eyebrow { font-size: 11px; font-weight: 500; letter-spacing: 0.25em; text-transform: uppercase; color: var(--blue); margin-bottom: 12px; }
+  .how-section h2 { font-family: 'DM Sans', sans-serif; font-size: clamp(24px, 3vw, 36px); font-weight: 600; color: var(--navy); margin-bottom: 12px; }
+  .how-section p { font-size: 16px; color: var(--text-muted); max-width: 560px; line-height: 1.8; }
+
+  .steps-row { display: flex; gap: 12px; margin: 32px 0 0; flex-wrap: wrap; }
+  .step-chip { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border: 2px solid var(--border); border-radius: 100px; font-size: 13px; font-weight: 500; color: var(--text-muted); transition: all 0.3s ease; background: var(--white); }
+  .step-chip .chip-num { width: 22px; height: 22px; border-radius: 50%; background: var(--light-gray); color: var(--mid-gray); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; transition: all 0.3s ease; flex-shrink: 0; }
+  .step-chip.active { border-color: var(--blue); color: var(--navy); }
+  .step-chip.active .chip-num { background: var(--blue); color: var(--white); }
+  .step-chip.complete { border-color: var(--success); color: var(--success); }
+  .step-chip.complete .chip-num { background: var(--success); color: var(--white); }
+
+  .audit-wrap { padding: 0 8vw 80px; max-width: 1100px; margin: 0 auto; }
+  .section-card { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 28px; transition: box-shadow 0.3s, border-color 0.3s; }
+  .section-card:hover { box-shadow: 0 4px 24px rgba(26,39,68,0.08); }
+  .section-card.complete { border-color: var(--success); }
+  .section-card.complete .section-header { background: #064e3b; }
+  .section-complete-badge { display: none; align-items: center; gap: 6px; background: var(--success); color: var(--white); font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 100px; margin-left: auto; }
+  .section-card.complete .section-complete-badge { display: flex; }
+  .section-card.complete .section-tag { display: none; }
+  .section-header { background: var(--navy); padding: 24px 32px; display: flex; align-items: center; gap: 16px; transition: background 0.4s; }
+  .section-num { width: 36px; height: 36px; background: var(--yellow); color: var(--navy); font-weight: 700; font-size: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .section-header h3 { color: var(--white); font-size: 18px; font-weight: 600; }
+  .section-header .section-tag { margin-left: auto; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.4); }
+  .section-body { background: var(--white); padding: 8px 32px 28px; }
+  .question { padding: 22px 0; border-bottom: 1px solid var(--light-gray); }
+  .question:last-of-type { border-bottom: none; }
+  .question p { font-size: 15px; color: var(--text); margin-bottom: 14px; line-height: 1.5; transition: color 0.2s; }
+  .question.answered p { color: var(--navy); font-weight: 500; }
+  .rating { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .rating-label { font-size: 11px; color: var(--mid-gray); min-width: 44px; letter-spacing: 0.05em; }
+  .rating-label.right { text-align: right; }
+  .rating-options { display: flex; gap: 8px; }
+  .rating-btn { width: 42px; height: 42px; border: 2px solid var(--border); background: var(--off-white); color: var(--text-muted); font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; border-radius: 8px; transition: all 0.15s ease; display: flex; align-items: center; justify-content: center; }
+  .rating-btn:hover { border-color: var(--blue); color: var(--blue); background: #eff6ff; transform: scale(1.1); }
+  .rating-btn.selected { background: var(--blue); border-color: var(--blue); color: var(--white); transform: scale(1.1); }
+  .section-footer { background: var(--off-white); border-top: 1px solid var(--border); padding: 16px 32px; display: flex; justify-content: flex-end; align-items: center; gap: 10px; font-size: 13px; color: var(--text-muted); }
+  .section-score-val { font-size: 24px; font-weight: 700; color: var(--navy); min-width: 32px; text-align: right; transition: color 0.3s; }
+  .section-card.complete .section-score-val { color: var(--success); }
+
+  .results-wrap { padding: 0 8vw 80px; max-width: 1100px; margin: 0 auto; }
+  .score-card { background: var(--navy); border-radius: 16px; padding: 56px 48px; text-align: center; margin-bottom: 32px; position: relative; overflow: hidden; }
+  .score-card::before { content: ''; position: absolute; top: -80px; right: -80px; width: 300px; height: 300px; background: radial-gradient(circle, rgba(251,191,36,0.12) 0%, transparent 70%); pointer-events: none; }
+  .score-label { font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; color: rgba(255,255,255,0.5); margin-bottom: 20px; }
+  .score-ring-wrap { display: flex; justify-content: center; margin-bottom: 28px; position: relative; }
+  .score-ring-svg { transform: rotate(-90deg); }
+  .score-ring-bg { fill: none; stroke: rgba(255,255,255,0.08); stroke-width: 10; }
+  .score-ring-fill { fill: none; stroke: var(--yellow); stroke-width: 10; stroke-linecap: round; stroke-dasharray: 440; stroke-dashoffset: 440; transition: stroke-dashoffset 0.8s cubic-bezier(0.34,1.56,0.64,1), stroke 0.5s ease; }
+  .score-ring-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; }
+  .score-ring-text .big { font-family: 'DM Sans', sans-serif; font-size: 52px; font-weight: 700; color: var(--yellow); line-height: 1; display: block; }
+  .score-ring-text .small { font-size: 13px; color: rgba(255,255,255,0.7); display: block; margin-top: 4px; }
+  .result-pill { display: none; flex-direction: column; align-items: center; gap: 8px; padding: 24px 40px; border-radius: 12px; max-width: 520px; margin: 0 auto; }
+  .result-pill.visible { display: flex; animation: popIn 0.5s cubic-bezier(0.34,1.56,0.64,1); }
+  .result-pill.solid { background: rgba(5,150,105,0.15); border: 1px solid rgba(5,150,105,0.35); }
+  .result-pill.pains { background: rgba(217,119,6,0.15); border: 1px solid rgba(217,119,6,0.35); }
+  .result-pill.emergency { background: rgba(220,38,38,0.15); border: 1px solid rgba(220,38,38,0.35); }
+  .result-pill .pill-name { font-size: 20px; font-weight: 700; color: var(--white); }
+  .result-pill .pill-desc { font-size: 14px; color: rgba(255,255,255,0.8); text-align: center; line-height: 1.6; }
+
+  .tiers-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 40px; }
+  .tier-card { border: 1px solid var(--border); border-radius: 10px; padding: 28px 24px; background: var(--white); }
+  .tier-card .range { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .tier-card.solid .range { color: var(--success); }
+  .tier-card.pains .range { color: var(--warning); }
+  .tier-card.emergency .range { color: var(--danger); }
+  .tier-card h4 { font-size: 15px; font-weight: 600; color: var(--navy); margin-bottom: 8px; }
+  .tier-card p { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
+
+  .download-strip { background: var(--off-white); border: 1px solid var(--border); border-radius: 12px; padding: 28px 36px; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; margin-bottom: 60px; }
+  .download-strip-left .eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--blue); margin-bottom: 6px; }
+  .download-strip-left h3 { font-size: 19px; font-weight: 700; color: var(--navy); margin-bottom: 6px; }
+  .download-strip-left p { font-size: 14px; color: var(--text-muted); line-height: 1.6; }
+  .download-btn { display: inline-flex; align-items: center; gap: 8px; background: var(--navy); color: var(--white); font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; padding: 14px 24px; border-radius: 8px; text-decoration: none; border: none; cursor: pointer; transition: all 0.2s; white-space: nowrap; flex-shrink: 0; }
+  .download-btn:hover { background: var(--blue); transform: translateY(-2px); }
+
+  .cta-section { background: linear-gradient(135deg, var(--navy-dark) 0%, var(--navy) 100%); padding: 80px 8vw; text-align: center; }
+  .cta-section h2 { font-family: 'DM Sans', sans-serif; font-size: clamp(28px, 4vw, 48px); font-weight: 600; color: var(--white); margin-bottom: 16px; line-height: 1.2; }
+  .cta-section h2 span { background: var(--yellow); color: var(--navy); padding: 0 8px 2px; border-radius: 4px; }
+  .cta-section p { font-size: 17px; color: rgba(255,255,255,0.75); max-width: 480px; margin: 0 auto 36px; line-height: 1.7; }
+  .cta-btn { display: inline-block; background: var(--yellow); color: var(--navy); font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; padding: 16px 40px; border-radius: 8px; text-decoration: none; border: none; cursor: pointer; transition: all 0.2s; }
+  .cta-btn:hover { background: var(--yellow-light); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(251,191,36,0.3); }
+  .cta-fine { margin-top: 16px; font-size: 12px; color: rgba(255,255,255,0.6); }
+
+  footer { background: var(--navy-dark); padding: 28px 8vw; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.08); }
+  footer .brand { font-weight: 600; font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; color: rgba(255,255,255,0.6); }
+  footer p { font-size: 12px; color: rgba(255,255,255,0.5); }
+
+  .confetti-piece { position: fixed; width: 10px; height: 10px; top: -10px; border-radius: 2px; animation: confettiFall linear forwards; pointer-events: none; z-index: 9999; }
+
+  /* MODAL */
+  .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(17,28,51,0.8); backdrop-filter: blur(4px); z-index: 9998; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: white; border-radius: 14px; width: 100%; max-width: 480px; overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,0.4); animation: modalIn 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+  .modal-header { background: linear-gradient(135deg, #111c33 0%, #1a2744 100%); padding: 28px 32px 24px; position: relative; }
+  .modal-header::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: #fbbf24; }
+  .modal-close { position: absolute; top: 16px; right: 16px; background: rgba(255,255,255,0.1); border: none; color: rgba(255,255,255,0.7); width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+  .modal-close:hover { background: rgba(255,255,255,0.25); color: white; }
+  .modal-header h3 { color: white; font-size: 19px; font-weight: 700; margin-bottom: 5px; font-family: 'DM Sans', sans-serif; }
+  .modal-header p { color: rgba(255,255,255,0.65); font-size: 13px; line-height: 1.55; }
+  .modal-header p span { color: #fbbf24; font-weight: 600; }
+  .modal-body { padding: 28px 32px 32px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+  .form-group label { font-size: 12px; font-weight: 700; color: #1a2744; letter-spacing: 0.05em; font-family: 'DM Sans', sans-serif; }
+  .form-group input { padding: 11px 14px; border: 1.5px solid #dde3ef; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 14px; color: #1e293b; transition: border-color 0.2s; outline: none; background: #f8fafc; }
+  .form-group input:focus { border-color: #2563eb; background: white; }
+  .form-group input::placeholder { color: #94a3b8; }
+  .modal-submit { width: 100%; padding: 14px; background: #1a2744; color: white; border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 22px; }
+  .modal-submit:hover { background: #2563eb; }
+  .modal-fine { font-size: 11px; color: #94a3b8; text-align: center; margin-top: 10px; line-height: 1.5; }
+
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes popIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+  @keyframes confettiFall { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
+  @keyframes modalIn { from { opacity: 0; transform: scale(0.9) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+
+  @media (max-width: 768px) {
+    .progress-bar-wrap { padding: 10px 4vw; gap: 8px; }
+    .pb-sections { display: none; }
+    .hero-stats { gap: 28px; }
+    .section-header { padding: 20px; }
+    .section-body { padding: 8px 20px 20px; }
+    .section-footer { padding: 14px 20px; }
+    .score-card { padding: 40px 24px; }
+    .tiers-grid { grid-template-columns: 1fr; }
+    footer { flex-direction: column; gap: 8px; text-align: center; }
+    .context-band { padding: 20px 6vw; }
+    .download-strip { flex-direction: column; text-align: center; }
+    .form-row { grid-template-columns: 1fr; }
+  }
+
+.context-band { background: #f0f4ff; border-top: 3px solid var(--blue); border-bottom: 1px solid #c7d7f8; }
+</style>
+</head>
+<body>
+
+<div class="progress-bar-wrap">
+  <span class="pb-label">Progress</span>
+  <div class="pb-track"><div class="pb-fill" id="pb-fill"></div></div>
+  <span class="pb-count" id="pb-count">0 / 16</span>
+  <div class="pb-sections">
+    <div class="pb-dot" id="dot-1">1</div>
+    <div class="pb-dot" id="dot-2">2</div>
+    <div class="pb-dot" id="dot-3">3</div>
+    <div class="pb-dot" id="dot-4">4</div>
+  </div>
+</div>
+
+<nav>
+  <div class="nav-brand"><span class="wordmark">Brixhouse</span><span class="sub">consulting</span></div>
+  <a href="https://meetings-na2.hubspot.com/brixhouse?uuid=08f59b22-f4fe-44f1-a696-08c7b9e0fdf2" class="nav-cta">Book a Call</a>
+</nav>
+
+<section class="hero">
+  <div class="hero-tag">📊 Free Resource · Q1 Churn Diagnostic</div>
+  <h1>Is Churn About to<br><span class="highlight">Wreck Your Year?</span></h1>
+  <p class="hero-sub">Q1 is historically the hardest quarter for SaaS retention. Whether you're a startup, solopreneur, or small team — if you're seeing early warning signs, or not seeing them at all — now is the time to find out where you stand.</p>
+  <div class="hero-stats">
+    <div class="hero-stat"><span class="num">1.47%</span><span class="label">Monthly churn Brixhouse helped achieve</span></div>
+    <div class="hero-stat"><span class="num">500+</span><span class="label">Clients managed</span></div>
+    <div class="hero-stat"><span class="num">25+</span><span class="label">Markets scaled across</span></div>
+  </div>
+</section>
+
+<div class="context-band">
+  <div class="icon">💡</div>
+  <div>
+    <h3>Q1 is when churn quietly compounds.</h3>
+    <p>End-of-year budget cuts, leadership changes, and post-holiday disengagement mean customers who were lukewarm in December are often gone by February. <strong>By the time Q2 hits, the damage is already done.</strong> This diagnostic helps you identify exactly where your retention is breaking down — so you can fix it before it shows up in your revenue.</p>
+  </div>
+</div>
+
+<div class="how-section">
+  <div class="section-eyebrow">How it works</div>
+  <h2>Diagnose your retention.<br>Know where it's breaking.</h2>
+  <p>Rate each statement from <strong>1 (Not in place)</strong> to <strong>5 (Fully executed)</strong>. Work through all four sections and your score will tell you whether your retention motion is a competitive advantage — or a liability heading into Q2.</p>
+  <div class="steps-row">
+    <div class="step-chip" id="chip-1"><span class="chip-num">1</span><span>Onboarding &amp; TTV</span></div>
+    <div class="step-chip" id="chip-2"><span class="chip-num">2</span><span>Health &amp; Warnings</span></div>
+    <div class="step-chip" id="chip-3"><span class="chip-num">3</span><span>Retention Plans</span></div>
+    <div class="step-chip" id="chip-4"><span class="chip-num">4</span><span>Renewal &amp; Expansion</span></div>
+  </div>
+</div>
+
+<div class="audit-wrap">
+
+  <div class="section-card" id="card-1">
+    <div class="section-header">
+      <div class="section-num">1</div>
+      <h3>Onboarding & Time-to-Value</h3>
+      <span class="section-tag">4 questions · /20</span>
+      <span class="section-complete-badge">✓ Section Complete</span>
+    </div>
+    <div class="section-body">
+      
+      <div class="question" id="q-1">
+        <p>New customers reach their first meaningful outcome within 30 days — and we can prove it.</p>
+        <div class="rating">
+          <span class="rating-label">Not at all</span>
+          <div class="rating-options">
+            <button class="rating-btn" data-qid="1" data-val="1">1</button>
+            <button class="rating-btn" data-qid="1" data-val="2">2</button>
+            <button class="rating-btn" data-qid="1" data-val="3">3</button>
+            <button class="rating-btn" data-qid="1" data-val="4">4</button>
+            <button class="rating-btn" data-qid="1" data-val="5">5</button>
+          </div>
+          <span class="rating-label right">Fully true</span>
+        </div>
+      </div>
+      <div class="question" id="q-2">
+        <p>Our onboarding process is documented, consistent, and doesn't rely on one person's institutional knowledge.</p>
+        <div class="rating">
+          <span class="rating-label">Not at all</span>
+          <div class="rating-options">
+            <button class="rating-btn" data-qid="2" data-val="1">1</button>
+            <button class="rating-btn" data-qid="2" data-val="2">2</button>
+            <button class="rating-btn" data-qid="2" data-val="3">3</button>
+            <button class="rating-btn" data-qid="2" data-val="4">4</button>
+            <button class="rating-btn" data-qid="2" data-val="5">5</button>
+          </div>
+          <span class="rating-label right">Fully true</span>
+        </div>
+      </div>
+      <div class="question" id="q-3">
+        <p>We actively track and review time-to-value as a team metric — not just anecdotally.</p>
+        <div class="rating">
+          <span class="rating-label">Not at all</span>
+          <div class="rating-options">
+            <button class="rating-btn" data-qid="3" data-val="1">1</button>
+            <button class="rating-btn" data-qid="3" data-val="2">2</button>
+            <button class="rating-btn" data-qid="3" data-val="3">3</button>
+            <button class="rating-btn" data-qid="3" data-val="4">4</button>
+            <button class="rating-btn" data-qid="3" data-val="5">5</button>
+          </div>
+          <span class="rating-label right">Fully true</span>
+        </div>
+      </div>
+      <div class="question" id="q-4">
+        <p>Customers who cancelled in the last 12 months — we know when in the lifecycle they left and why.</p>
+        <div class="rating">
+          <span class="rating-label">Not at all</span>
+          <div class="rating-options">
+            <button class="rating-btn" data-qid="4" data-val="1">1</button>
+            <button class="rating-btn" data-qid="4" data-val="2">2</button>
+            <button class="rating-btn" data-qid="4" data-val="3">3</button>
+            <button class="rating-btn" data-qid="4" data-val="4">4</button>
+            <button class="rating-btn" data-qid="4" data-val="5">5</button>
+          </div>
+          <span class="rating-label right">Fully true</span>
+        </div>
+      </div>
+    </div>
+    <div class="section-footer">
+      <span>Section score</span>
+      <span class="section-score-val" id="s1-score">—</span>
+      <span style="color:var(--mid-gray);font-size:12px">/ 20</span>
+    </div>
+  </div>
+  <div class="section-card" id="card-2">
+    <div class="section-header">
+      <div class="section-num">2</div>
+      <h3>Customer Health & Early Warning Signals</h3>
+      <span class="section-tag">4 questions · /20</span>
+      <span class="section-complete-badge">✓ Section Complete</span>
+    </div>
+    <div class="section-body">
+      
+      <div class="question" id="q-5">
+        <p>We have a defined way to track which customers might be at risk — and the whole team can see it.</p>
+        <div class="rating">
+          <span class="rating-label">Not at all</span>
+          <div class="rating-options">
+            <button class="rating-btn" data-qid="5" data-val="1">1</button>
+            <button class="rating-btn" data-qid="5" data-val="2">2</button>
+            <button class="rating-btn" data-qid="5" data-val="3">3</button>
+            <button class="rating-btn" data-qid="5" data-val="4">4</button>
+            <button class="rating-btn" data-qid="5" data-val="5">5</button>
+          </div>
+          <span class="rating-label right">Fully true</span>
+        </div>
+      </div>
+      <div class="question" id="q-6">
+        <p>We identify at-risk customers before they ask to cancel — not after.</p>
+        <div class="rating">
+          <span class="rating-label">Not at all</span>
+          <div class="rating-options">
+            <button class="rating-btn" data-qid="6" data-val="1">1</button>
+            <button class="rating-btn" data-qid="6" data-val="2">2</button>
+            <button class="rating-btn" data-qid="6" data-val="3">3</button>
+            <button class="rating-btn" data-qid="6" data-val="4">4</button>
+            <button class="rating-btn" data-qid="6" data-val="5">5</button>
+          </div>
+          <span class="rating-label right">Fully true</span>
+        </div>
+      </div>
+      <div class="question" id="q-7">
+        <p>Product usage data is visible to our team and actively used to flag disengagement.</p>
+        <div class="rating">
+          <span class="rating-label">Not at all</span>
+          <div class="rating-options">
+            <button class="rating-btn" data-qid="7" data-val="1">1</button>
+            <button class="rating-btn" data-qid="7" data-val="2">2</button>
+            <button class="rating-btn" data-qid="7" data-val="3">3</button>
+            <button class="rating-btn" data-qid="7" data-val="4">4</button>
+            <button class="rating-btn" data-qid="7" data-val="5">5</button>
+          </div>
+          <span class="rating-label right">Fully true</span>
+        </div>
+      </div>
+      <div class="question" id="q-8">
+        <p>We have a regular cadence of proactive outreach — not just reactive check-ins when things go wrong.</p>
+        <div class="rating">
+          <span class="rating-label">Not at all</span>
+          <div class="rating-options">
+            <button class="rating-btn" data-qid="8" data-val="1">1</button>
+            <button class="rating-btn" data-qid="8" data-val="2">2</button>
+            <button class="rating-btn" data-qid="8" data-val="3">3</button>
+            <button class="rating-btn" data-qid="8" data-val="4">4</button>
+            <button class="rating-btn" data-qid="8" data-val="5">5</button>
+          </div>
+          <span class="rating-label right">Fully true</span>
+        </div>
+      </div>
+    </div>
+    <div class="section-footer">
+      <span>Section score</span>
+      <span class="section-score-val" id="s2-score">—</span>
+      <span style="color:var(--mid-gray);font-size:12px">/ 20</span>
+    </div>
+  </div>
+  <div class="section-card" id="card-3">
+    <div class="section-header">
+      <div class="section-num">3</div>
+      <h3>Retention Processes & Save Plans</h3>
+      <span class="section-tag">4 questions · /20</span>
+      <span class="section-complete-badge">✓ Section Complete</span>
+    </div>
+    <div class="section-body">
+      
+      <div class="question" id="q-9">
+        <p>We have a written plan for what happens when a customer signals they want to cancel.</p>
+        <div class="rating">
+          <span class="rating-label">Not at all</span>
+          <div class="rating-options">
+            <button class="rating-btn" data-qid="9" data-val="1">1</button>
+            <button class="rating-btn" data-qid="9" data-val="2">2</button>
+            <button class="rating-btn" data-qid="9" data-val="3">3</button>
+            <button class="rating-btn" data-qid="9" data-val="4">4</button>
+            <button class="rating-btn" data-qid="9" data-val="5">5</button>
+          </div>
+          <span class="rating-label right">Fully true</span>
+        </div>
+      </div>
+      <div class="question" id="q-10">
+        <p>When we lose a customer, we conduct a structured review to find the real reason — not just accept what they say.</p>
+        <div class="rating">
+          <span class="rating-label">Not at all</span>
+          <div class="rating-options">
+            <button class="rating-btn" data-qid="10" data-val="1">1</button>
+            <button class="rating-btn" data-qid="10" data-val="2">2</button>
+            <button class="rating-btn" data-qid="10" data-val="3">3</button>
+            <button class="rating-btn" data-qid="10" data-val="4">4</button>
+            <button class="rating-btn" data-qid="10" data-val="5">5</button>
+          </div>
+          <span class="rating-label right">Fully true</span>
+        </div>
+      </div>
+      <div class="question" id="q-11">
+        <p>Our team has clear steps for when and how to escalate an at-risk customer to leadership.</p>
+        <div class="rating">
+          <span class="rating-label">Not at all</span>
+          <div class="rating-options">
+            <button class="rating-btn" data-qid="11" data-val="1">1</button>
+            <button class="rating-btn" data-qid="11" data-val="2">2</button>
+            <button class="rating-btn" data-qid="11" data-val="3">3</button>
+            <button class="rating-btn" data-qid="11" data-val="4">4</button>
+            <button class="rating-btn" data-qid="11" data-val="5">5</button>
+          </div>
+          <span class="rating-label right">Fully true</span>
+        </div>
+      </div>
+      <div class="question" id="q-12">
+        <p>Cancellation reasons are tracked, categorized, and reviewed with the team on a regular basis.</p>
+        <div class="rating">
+          <span class="rating-label">Not at all</span>
+          <div class="rating-options">
+            <button class="rating-btn" data-qid="12" data-val="1">1</button>
+            <button class="rating-btn" data-qid="12" data-val="2">2</button>
+            <button class="rating-btn" data-qid="12" data-val="3">3</button>
+            <button class="rating-btn" data-qid="12" data-val="4">4</button>
+            <button class="rating-btn" data-qid="12" data-val="5">5</button>
+          </div>
+          <span class="rating-label right">Fully true</span>
+        </div>
+      </div>
+    </div>
+    <div class="section-footer">
+      <span>Section score</span>
+      <span class="section-score-val" id="s3-score">—</span>
+      <span style="color:var(--mid-gray);font-size:12px">/ 20</span>
+    </div>
+  </div>
+  <div class="section-card" id="card-4">
+    <div class="section-header">
+      <div class="section-num">4</div>
+      <h3>Renewal & Expansion Motion</h3>
+      <span class="section-tag">4 questions · /20</span>
+      <span class="section-complete-badge">✓ Section Complete</span>
+    </div>
+    <div class="section-body">
+      
+      <div class="question" id="q-13">
+        <p>Renewals are managed proactively — we start the conversation 60–90 days out, not when the contract expires.</p>
+        <div class="rating">
+          <span class="rating-label">Not at all</span>
+          <div class="rating-options">
+            <button class="rating-btn" data-qid="13" data-val="1">1</button>
+            <button class="rating-btn" data-qid="13" data-val="2">2</button>
+            <button class="rating-btn" data-qid="13" data-val="3">3</button>
+            <button class="rating-btn" data-qid="13" data-val="4">4</button>
+            <button class="rating-btn" data-qid="13" data-val="5">5</button>
+          </div>
+          <span class="rating-label right">Fully true</span>
+        </div>
+      </div>
+      <div class="question" id="q-14">
+        <p>Upsells and cross-sells are part of our regular workflow — not an afterthought.</p>
+        <div class="rating">
+          <span class="rating-label">Not at all</span>
+          <div class="rating-options">
+            <button class="rating-btn" data-qid="14" data-val="1">1</button>
+            <button class="rating-btn" data-qid="14" data-val="2">2</button>
+            <button class="rating-btn" data-qid="14" data-val="3">3</button>
+            <button class="rating-btn" data-qid="14" data-val="4">4</button>
+            <button class="rating-btn" data-qid="14" data-val="5">5</button>
+          </div>
+          <span class="rating-label right">Fully true</span>
+        </div>
+      </div>
+      <div class="question" id="q-15">
+        <p>We track Net Revenue Retention and leadership reviews it regularly.</p>
+        <div class="rating">
+          <span class="rating-label">Not at all</span>
+          <div class="rating-options">
+            <button class="rating-btn" data-qid="15" data-val="1">1</button>
+            <button class="rating-btn" data-qid="15" data-val="2">2</button>
+            <button class="rating-btn" data-qid="15" data-val="3">3</button>
+            <button class="rating-btn" data-qid="15" data-val="4">4</button>
+            <button class="rating-btn" data-qid="15" data-val="5">5</button>
+          </div>
+          <span class="rating-label right">Fully true</span>
+        </div>
+      </div>
+      <div class="question" id="q-16">
+        <p>Our happiest customers are actively used as references or case studies — not just left to quietly renew.</p>
+        <div class="rating">
+          <span class="rating-label">Not at all</span>
+          <div class="rating-options">
+            <button class="rating-btn" data-qid="16" data-val="1">1</button>
+            <button class="rating-btn" data-qid="16" data-val="2">2</button>
+            <button class="rating-btn" data-qid="16" data-val="3">3</button>
+            <button class="rating-btn" data-qid="16" data-val="4">4</button>
+            <button class="rating-btn" data-qid="16" data-val="5">5</button>
+          </div>
+          <span class="rating-label right">Fully true</span>
+        </div>
+      </div>
+    </div>
+    <div class="section-footer">
+      <span>Section score</span>
+      <span class="section-score-val" id="s4-score">—</span>
+      <span style="color:var(--mid-gray);font-size:12px">/ 20</span>
+    </div>
+  </div>
+</div>
+
+<div class="results-wrap">
+  <div class="section-eyebrow">Your Results</div>
+  <div class="score-card">
+    <div class="score-label">Total Retention Score</div>
+    <div class="score-ring-wrap">
+      <svg class="score-ring-svg" width="160" height="160" viewBox="0 0 160 160">
+        <circle class="score-ring-bg" cx="80" cy="80" r="70"/>
+        <circle class="score-ring-fill" id="ring-fill" cx="80" cy="80" r="70"/>
+      </svg>
+      <div class="score-ring-text">
+        <span class="big" id="total-score">0</span>
+        <span class="small">out of 80</span>
+      </div>
+    </div>
+    <div class="result-pill solid" id="tier-solid"><span class="pill-name">✅ Retention Machine</span><span class="pill-desc">Your retention motion is strong. Let's identify the remaining gaps and build toward best-in-class performance.</span></div>
+    <div class="result-pill pains" id="tier-pains"><span class="pill-name">⚠️ Retention Risk</span><span class="pill-desc">There are real gaps in your retention motion. Q2 is coming fast — let's get in front of this before it compounds.</span></div>
+    <div class="result-pill emergency" id="tier-emergency"><span class="pill-name">🚨 Churn Emergency</span><span class="pill-desc">Your retention infrastructure isn't built for scale. Every week you wait is revenue walking out the door.</span></div>
+  </div>
+  <div class="tiers-grid">
+    <div class="tier-card solid"><div class="range">64–80</div><h4>Retention Machine</h4><p>You have the fundamentals in place. Let's optimize and scale what's already working.</p></div>
+    <div class="tier-card pains"><div class="range">40–63</div><h4>Retention Risk</h4><p>Gaps exist that are likely already costing you accounts you don't know you're about to lose.</p></div>
+    <div class="tier-card emergency"><div class="range">Under 40</div><h4>Churn Emergency</h4><p>Your retention infrastructure isn't built for your current stage. This is where Brixhouse does its best work.</p></div>
+  </div>
+
+  <div class="download-strip">
+    <div class="download-strip-left">
+      <div class="eyebrow">Free Download</div>
+      <h3>Your Q1 Churn Diagnostic Action Plan</h3>
+      <p>A 2-page PDF with specific next steps based on your score — ready to share with your team.</p>
+    </div>
+    <a class="download-btn" href="https://brixhouse.co/brixhouse-churn-playbook.pdf" target="_blank" rel="noopener"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download Action Plan</a>
+  </div>
+</div>
+
+<section class="cta-section">
+  <h2>Churn compounds.<br><span>Q2 won't wait.</span></h2>
+  <p>Brixhouse Consulting helps SaaS companies, startups, and small teams build systems that keep customers around. Let's find out where yours is breaking.</p>
+  <a href="https://meetings-na2.hubspot.com/brixhouse?uuid=08f59b22-f4fe-44f1-a696-08c7b9e0fdf2" class="cta-btn">Book a Free 30-Minute Strategy Call</a>
+  <div class="cta-fine">No commitment. Just clarity. </div>
+</section>
+
+<footer>
+  <div class="brand">Brixhouse Consulting</div>
+  <p>Fractional COO &amp; CS Services · SaaS &amp; Startups</p>
+</footer>
+
+
+<script src="audit.js"></script>
+</body>
+</html>
